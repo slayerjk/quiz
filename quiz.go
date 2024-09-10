@@ -6,7 +6,9 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
+	"slices"
 	"strings"
 	"time"
 )
@@ -20,20 +22,22 @@ func main() {
 	// defining flags
 	csvFilePath := flag.String("f", "problems.csv", "set csv('question,answer' format) file path; default: 'problems.csv'")
 	timerSeconds := flag.Int("t", 30, "time execution limit, seconds; default: 30")
-	// isShuffled := flag.Bool("s", false, "shuffle quiz file questions order; default: false")
+	isShuffled := flag.Bool("s", false, "shuffle quiz file questions order; default: false")
 	flag.Parse()
 
 	// parsing csv file
-	problems, err := parseCsv(*&csvFilePath)
+	quizData, err := parseCsv(*&csvFilePath)
 	if err != nil {
 		log.Fatalf("failed to parse csv file %s:\n\t%v", *csvFilePath, err)
 	}
-	totalQuestions = len(problems)
+	totalQuestions = len(quizData)
 
 	// printing app intro info & options selected
 	fmt.Println("This is a Quiz program written in GO as a task from 'https://github.com/gophercises/quiz'.\n-----")
 
-	// TODO: making order of quiz questions
+	// making order of quiz questions
+	quizOrder := defineQuizOrder(*isShuffled, len(quizData))
+	fmt.Println(quizOrder)
 
 	// Wait user to start quiz
 	fmt.Println("Press ENTER when you're ready: ")
@@ -50,8 +54,8 @@ func main() {
 	fmt.Println("Quiz is started!")
 
 quizLoop:
-	for _, v := range problems {
-		fmt.Printf("The question is: %s\n", v.question)
+	for _, v := range quizOrder {
+		fmt.Printf("The question is: %s\n", quizData[v].question)
 
 		// channel to recieve user answers
 		answerCh := make(chan string)
@@ -71,7 +75,7 @@ quizLoop:
 			break quizLoop
 		case answer := <-answerCh:
 			// compare normalized user answer with correct answer
-			if strings.TrimSpace(strings.ToLower(answer)) == v.answer {
+			if strings.TrimSpace(strings.ToLower(answer)) == quizData[v].answer {
 				correctAnswers++
 			}
 			answeredQuestions++
@@ -105,9 +109,35 @@ func parseCsv(path *string) ([]quiz, error) {
 	for i, v := range csvData {
 		result[i] = quiz{
 			question: v[0],
-			answer:   strings.TrimSpace(v[1]),
+			// normalizing correct answer
+			answer: strings.TrimSpace(strings.ToLower(v[1])),
 		}
 	}
 
 	return result, nil
+}
+
+func defineQuizOrder(flag bool, lenOfData int) []int {
+	result := make([]int, 0)
+	randNum := rand.Intn(lenOfData)
+
+	if !flag {
+		for i := 0; i < lenOfData; i++ {
+			result = append(result, i)
+		}
+	} else {
+		for i := 0; i < lenOfData; i++ {
+			for {
+				if isPresent := slices.Contains(result, randNum); isPresent {
+					randNum = rand.Intn(lenOfData)
+					continue
+				} else {
+					break
+				}
+			}
+			result = append(result, randNum)
+		}
+	}
+
+	return result
 }
