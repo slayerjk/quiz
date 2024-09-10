@@ -7,20 +7,18 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
 
 func main() {
-	timerCh := make(chan string)
 	var (
 		userAnswer                                        string
 		totalQuestions, answeredQuestions, correctAnswers int
 	)
 
 	// defining flags
-	csvFilePath := flag.String("f", "problems.csv", "set csv('question,answer') file path; default: 'problems.csv'")
+	csvFilePath := flag.String("f", "problems.csv", "set csv('question,answer' format) file path; default: 'problems.csv'")
 	timerSeconds := flag.Int("t", 30, "time execution limit, seconds; default: 30")
 	// isShuffled := flag.Bool("s", false, "shuffle quiz file questions order; default: false")
 	flag.Parse()
@@ -33,7 +31,7 @@ func main() {
 	totalQuestions = len(problems)
 
 	// printing app intro info & options selected
-	fmt.Println("This is a Quiz program written in GOas a task from 'https://github.com/gophercises/quiz'.\n-----")
+	fmt.Println("This is a Quiz program written in GO as a task from 'https://github.com/gophercises/quiz'.\n-----")
 
 	// TODO: making order of quiz questions
 
@@ -45,42 +43,41 @@ func main() {
 		log.Fatal(errR)
 	}
 
-	// Start timer
-	go func() {
-		// first convert timer seconds given in -s flag(30 default) to string to parse time duration
-		timerSecondsString := strconv.Itoa(*timerSeconds)
-
-		// setting duration for timer
-		duration, err := time.ParseDuration(timerSecondsString + "s")
-		if err != nil {
-			log.Fatalf("FAILED: to parse duration from user input:\n\t%v", err)
-		}
-
-		// starting timer, sending msg to channel when expired
-		timer := time.NewTimer(duration)
-		<-timer.C
-		timerCh <- "Timer is EXPIRED!"
-	}()
+	// starting timer, sending msg to channel when expired
+	timer := time.NewTimer(time.Duration(*timerSeconds) * time.Second)
 
 	// quiz loop
 	fmt.Println("Quiz is started!")
+
+quizLoop:
 	for _, v := range problems {
-		select {
-		case msg := <-timerCh:
-			fmt.Println(msg)
-			fmt.Printf("\nYour result is %d correct answers of %d answered of %d total questions!\n", correctAnswers, answeredQuestions, totalQuestions)
-			return
-		default:
-			fmt.Printf("The question is: %s\n", v.question)
+		fmt.Printf("The question is: %s\n", v.question)
+
+		// channel to recieve user answers
+		answerCh := make(chan string)
+
+		// running goroutine to get & validate user answers
+		go func() {
 			fmt.Print("Your answer: ")
 			fmt.Scan(&userAnswer)
 
-			if *&userAnswer == v.answer {
+			answerCh <- userAnswer
+		}()
+
+		// waiting either for time expiration or continue to ask questions
+		select {
+		case <-timer.C:
+			fmt.Println("Timer is expired!")
+			break quizLoop
+		case answer := <-answerCh:
+			// compare normalized user answer with correct answer
+			if strings.TrimSpace(strings.ToLower(answer)) == v.answer {
 				correctAnswers++
 			}
 			answeredQuestions++
 		}
 	}
+
 	fmt.Printf("\nYour result is %d correct answers of %d answered of %d total questions!\n", correctAnswers, answeredQuestions, totalQuestions)
 }
 
@@ -94,6 +91,7 @@ func parseCsv(path *string) ([]quiz, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open csv file %s:\n\t%v", *path, err)
 	}
+	defer file.Close()
 
 	reader := csv.NewReader(file)
 
