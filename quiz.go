@@ -20,9 +20,9 @@ func main() {
 	)
 
 	// defining flags
-	csvFilePath := flag.String("f", "problems.csv", "set csv('question,answer' format) file path; default: 'problems.csv'")
-	timerSeconds := flag.Int("t", 30, "time execution limit, seconds; default: 30")
-	isShuffled := flag.Bool("s", false, "shuffle quiz file questions order; default: false")
+	csvFilePath := flag.String("f", "problems.csv", "set csv('question,answer' format) file path")
+	timerSeconds := flag.Int("t", 30, "time execution limit, seconds")
+	isShuffled := flag.Bool("s", false, "shuffle quiz file questions order")
 	flag.Parse()
 
 	// parsing csv file
